@@ -9,7 +9,8 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 // Clone the static website code from Git
-                git 'https://github.com/Sahithchaganti2004/finalFSI.git'
+                git url: 'https://github.com/Sahithchaganti2004/finalFSI.git', branch: 'main'
+
             }
         }
 
