@@ -1,73 +1,42 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Choose whether to apply or destroy the Terraform infrastructure')
-    }
-
     environment {
-        AWS_ACCESS_KEY_ID = credentials('aws-credentials') 
-        AWS_SECRET_ACCESS_KEY = credentials('aws-credentials') 
+        DOCKER_IMAGE = "chsks2004/chsks2004:latest"
     }
 
     stages {
-        stage('Checkout Code') {
+        stage('Clone Repository') {
             steps {
-                checkout scm
+                // Clone the static website code from Git
+                git url: 'https://github.com/Sahithchaganti2004/finalFSI.git', branch: 'main'
+
             }
         }
 
-        stage('Terraform Init') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    sh 'terraform init'
+                    docker.build(DOCKER_IMAGE)
                 }
             }
         }
 
-        stage('Terraform Plan') {
+        stage('Push to Docker Hub') {
             steps {
                 script {
-                    sh 'terraform plan'
-                }
-            }
-        }
-
-        stage('Terraform Apply') {
-            when {
-                expression { return params.ACTION == 'apply' }
-            }
-            steps {
-                script {
-                    sh 'terraform apply -auto-approve'
-                }
-            }
-        }
-
-        stage('Terraform Destroy') {
-            when {
-                expression { return params.ACTION == 'destroy' }
-            }
-            steps {
-                script {
-                    sh 'terraform destroy -auto-approve'
-                }
-            }
-        }
-
-        stage('Docker Build and Push') {
-            when {
-                expression { return params.ACTION == 'apply' && fileExists('Dockerfile') }
-            }
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_HUB_USERNAME', passwordVariable: 'DOCKER_HUB_PASSWORD')]) {
-                    script {
-                        sh '''
-                            echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
-                        '''
-                        sh 'docker build -t $DOCKER_HUB_USERNAME/static-website .'
-                        sh 'docker push $DOCKER_HUB_USERNAME/static-website'
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-credentials') {
+                        docker.image(DOCKER_IMAGE).push()
                     }
+                }
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                script {
+                    // Run the Docker container locally (or specify server details if deploying remotely)
+                    docker.image(DOCKER_IMAGE).run('-p 80:80')
                 }
             }
         }
@@ -75,7 +44,7 @@ pipeline {
 
     post {
         always {
-            cleanWs() 
+            cleanWs()
         }
     }
 }
